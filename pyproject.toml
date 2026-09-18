@@ -3,11 +3,17 @@ name = "recipe-hackathon"
 version = "0.1.0"
 description = "Parse cookbook epubs into a recipe database"
 requires-python = ">=3.11"
-dependencies = []
+dependencies = [
+    "requests>=2.31",
+    "duckdb>=1.0",
+    "numpy>=2.4.6",
+    "unsloth>=2026.9.7",
+]
 
 [dependency-groups]
 dev = ["pytest>=8"]
 
 [tool.pytest.ini_options]
-testpaths = ["."]
+testpaths = ["tests"]
+pythonpath = [".", "finetune", "scripts"]  # tests/ live in a subdir; the modules under test do not
 addopts = "-x -s"
