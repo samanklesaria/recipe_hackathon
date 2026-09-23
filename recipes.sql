@@ -28,9 +28,6 @@ CREATE TABLE recipe_ingredients (
     recipe_id INTEGER NOT NULL REFERENCES recipes(id),
     ingredient_id INTEGER NOT NULL REFERENCES ingredients(id),
     quantity VARCHAR
-    -- No (recipe_id, ingredient_id) primary key: a recipe may use the same
-    -- ingredient twice with different amounts (minced in the sauce, whole on top).
-    -- No ON DELETE CASCADE: DuckDB does not implement cascading deletes.
 );
 
 -- One-line gloss of an ingredient ("urad dal - split black lentil, South Asian
@@ -41,11 +38,7 @@ CREATE TABLE ingredient_expansions (
     expansion VARCHAR NOT NULL
 );
 
--- Synthetic store descriptions for the store-matching fine-tune, written in the
--- same voice as manually_tagged/grocery_store_examples.md but LLM-generated for
--- breadth (see finetune/store_matching.md). Training only -- the hand-labelled
--- eval stores stay in that markdown file and never land here, or the fine-tune
--- would be scored on stores it trained on.
+-- Synthetic store descriptions for the store-matching fine-tune
 CREATE SEQUENCE IF NOT EXISTS training_stores_id_seq;
 
 CREATE TABLE training_stores (
@@ -85,3 +78,73 @@ CREATE TABLE recipe_pairings (
 
 CREATE INDEX idx_recipe_requires_requires ON recipe_requires(requires_id);
 CREATE INDEX idx_recipe_pairings_paired ON recipe_pairings(paired_id);
+
+-- One draw from Beta(a, b), used for Thompson sampling over recipe goodness.
+-- ponytail: normal approximation via Box-Muller, not a real Beta sampler --
+-- DuckDB has no gamma variate. It is visibly wrong only when a or b is below
+-- ~1 (we always pass counts+1, so never) and slightly over-confident in the
+-- tails. Swap for a UDF if the ranking ever looks off.
+CREATE OR REPLACE MACRO beta_sample(a, b) AS
+    least(1.0, greatest(0.0,
+        a / (a + b)
+        + sqrt(a * b / ((a + b) * (a + b) * (a + b + 1)))
+          * sqrt(-2 * ln(random())) * cos(2 * pi() * random())
+    ));
+
+-- A week's worth of dinners. Picks `n` non-side recipes not cooked in the last
+-- two weeks, ranked by a Thompson draw on upvotes/downvotes, then returns them
+-- plus everything the book says to serve alongside. One row per recipe;
+-- for_recipe is NULL for a main pick and the main's id for a pairing.
+CREATE OR REPLACE MACRO plan_week(n) AS TABLE (
+    WITH RECURSIVE chosen AS (
+        SELECT id
+        FROM recipes
+        WHERE NOT is_side
+          AND (last_cooked IS NULL OR last_cooked <= current_date - INTERVAL 14 DAY)
+        QUALIFY row_number() OVER (
+            ORDER BY beta_sample(upvotes + 1, downvotes + 1) DESC
+        ) <= n
+    ),
+    plan AS (
+        SELECT id AS recipe_id, NULL::INTEGER AS for_recipe FROM chosen
+        UNION
+        -- pairings are stored in whichever direction the book stated them
+        SELECT DISTINCT ON (p.b) p.b, c.id
+        FROM chosen c
+        JOIN (
+            SELECT recipe_id AS a, paired_id AS b FROM recipe_pairings
+            UNION ALL
+            SELECT paired_id, recipe_id FROM recipe_pairings
+        ) p ON p.a = c.id
+        WHERE p.b NOT IN (SELECT id FROM chosen)
+    ),
+    -- sauces, spice blends and stocks the plan depends on, all the way down
+    components AS (
+        SELECT rr.requires_id AS recipe_id, rr.recipe_id AS for_recipe
+        FROM recipe_requires rr
+        JOIN plan p ON p.recipe_id = rr.recipe_id
+        UNION
+        SELECT rr.requires_id, rr.recipe_id
+        FROM recipe_requires rr
+        JOIN components c ON c.recipe_id = rr.recipe_id
+    ),
+    everything AS (
+        -- a recipe reached more than one way is listed once, as a main if it is
+        -- one; NULLS FIRST is what picks the main over the component row
+        SELECT DISTINCT ON (recipe_id) recipe_id, for_recipe
+        FROM (SELECT * FROM plan UNION ALL SELECT * FROM components)
+        ORDER BY recipe_id, for_recipe NULLS FIRST
+    )
+    SELECT
+        pl.recipe_id,
+        r.name,
+        r.cooktime,
+        r.is_side,
+        pl.for_recipe,
+        (SELECT list(coalesce(ri.quantity || ' ', '') || i.description)
+         FROM recipe_ingredients ri
+         JOIN ingredients i ON i.id = ri.ingredient_id
+         WHERE ri.recipe_id = pl.recipe_id) AS ingredients
+    FROM everything pl
+    JOIN recipes r ON r.id = pl.recipe_id
+);

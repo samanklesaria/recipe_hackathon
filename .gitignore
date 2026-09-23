@@ -1,0 +1,8 @@
+example_cookbooks/*
+.venv
+.pytest_cache
+.DS_Store
+uv.lock
+recipes.db
+*.pyc
+.envrc

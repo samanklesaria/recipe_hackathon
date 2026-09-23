@@ -1,22 +1,4 @@
 """Fine-tune embeddinggemma-300m into the two-tower store matcher.
-
-Step 7 of store_matching.md. Training pairs come from the db (steps 4-6 fill
-embed_training_data); the score is the unnormalized dot product of the two
-towers and the loss is BCE against the label probability:
-
-    logit = E_store(store) . E_ing(ingredient)      P(stocked) = sigmoid(logit)
-
-One tower, two prompt prefixes -- the same prefixes baseline_eval.py uses, so
-the before/after numbers are comparable. Evaluation is the hand-labelled
-eval_pairs.csv and nothing else: every training label is the LLM's opinion, so
-scoring on held-out training pairs would only measure how well we copied it.
-
-    uv run python scripts/store_descriptions.py   # steps 5-6, fill the db
-    uv run python scripts/label_pairs.py
-    uv run python finetune/train.py               # from the repo root
-
-Prints the zero-shot scoreboard, trains, prints it again. If the second is not
-clearly better than the first, store_matching.md says do not ship the fine-tune.
 """
 import argparse
 
@@ -25,12 +7,15 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 from datasets import Dataset
-from sentence_transformers import (SentenceTransformerTrainer,
+from peft import LoraConfig
+from sentence_transformers import (SentenceTransformer, SentenceTransformerTrainer,
                                    SentenceTransformerTrainingArguments)
-from unsloth import FastSentenceTransformer, is_bf16_supported
-
-import baseline_eval as be
+from sentence_transformers.base.modules import Normalize
 import settings
+from scaled_normalize import ScaledNormalize
+import store_llm
+
+PROMPTS = {"ingredient": store_llm.ING_PREFIX, "store": store_llm.STORE_PREFIX}
 
 OUT = "finetune/embeddinggemma_store_lora"
 
@@ -42,12 +27,6 @@ FROM embed_training_data d
 JOIN ingredient_expansions e ON e.ingredient_id = d.ingredient_id
 JOIN training_stores s ON s.id = d.training_store_id
 """
-
-# The prompts trainer arg prepends a fixed string per column; be's prefixes are
-# format strings whose placeholder is at the end, so .format("") is that string.
-PROMPTS = {"ingredient": be.ING_PREFIX.format(""),
-           "store": be.STORE_PREFIX.format("")}
-
 
 class DotBCELoss(torch.nn.Module):
     """BCE on the raw dot product of the two towers.
@@ -65,21 +44,16 @@ class DotBCELoss(torch.nn.Module):
         return F.binary_cross_entropy_with_logits(
             (a * b).sum(-1), labels.float())
 
+PROBS = {"always": 0.95, "usually": 0.80, "sometimes": 0.20, "never": 0.05}
 
 def load_training_data(db):
     rows = duckdb.connect(db, read_only=True).execute(SQL).fetchall()
     if not rows:
-        raise SystemExit(f"{db}: embed_training_data is empty -- run steps 5-6 "
-                         f"of finetune/store_matching.md first.")
-    labels = np.array([r[2] for r in rows])
-    bad = np.isin(labels, be.LABELS, invert=True)
-    if bad.any():
-        raise SystemExit(f"{db}: bad label {labels[bad][0]!r} in embed_training_data")
+        raise SystemExit(f"{db}: embed_training_data is empty")
     return Dataset.from_dict({
         "ingredient": [r[0] for r in rows],
         "store": [r[1] for r in rows],
-        # The name "label" is what SentenceTransformerTrainer hands the loss.
-        "label": be.P[np.argmax(labels[:, None] == be.LABELS, axis=-1)],
+        "label": [PROBS[r[2]] for r in rows]
     })
 
 
@@ -94,43 +68,39 @@ def score(model, gloss, descs):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--db", default=settings.DB)
-    ap.add_argument("--pairs", default=be.PAIRS)
-    ap.add_argument("--stores", default=be.STORES)
     ap.add_argument("--out", default=OUT)
     ap.add_argument("--epochs", type=float, default=1)
     ap.add_argument("--batch-size", type=int, default=32)
     ap.add_argument("--lr", type=float, default=2e-5)
     args = ap.parse_args()
 
-    train = load_training_data(args.db)
-    _, gloss, names, descs, truth = be.load_eval(args.pairs, args.stores)
-    print(f"{len(train)} training pairs from {args.db}\n")
+    split = load_training_data(args.db).train_test_split(
+        test_size=0.1, seed=3407)
 
-    model = FastSentenceTransformer.from_pretrained(
-        model_name="unsloth/embeddinggemma-300m",
-        max_seq_length=512,   # glosses are one line, store blurbs two
-        full_finetuning=False,
-    )
-
-    print("=== zero-shot (this is the number to beat) ===")
-    be.report(score(model, gloss, descs), truth, len(names))
-
-    model = FastSentenceTransformer.get_peft_model(
-        model,
+    # Not unsloth: without bf16 (Turing) it keeps the base weights in fp16 and
+    # turns off loss scaling, so the backward pass overflows to NaN.
+    model = SentenceTransformer("unsloth/embeddinggemma-300m")
+    model.max_seq_length = 512   # glosses are one line, store blurbs two
+    assert isinstance(model[-1], Normalize)
+    model[-1] = ScaledNormalize().to(model.device)
+    model.add_adapter(LoraConfig(
         r=32,
         target_modules=["q_proj", "k_proj", "v_proj", "o_proj",
                         "gate_proj", "up_proj", "down_proj"],
         lora_alpha=64,
         lora_dropout=0,
         bias="none",
-        use_gradient_checkpointing="unsloth",
-        random_state=3407,
         task_type="FEATURE_EXTRACTION",
-    )
+    ))
 
     SentenceTransformerTrainer(
         model=model,
-        train_dataset=train,
+        train_dataset=split["train"],
+        # ponytail: no evaluator -- eval_dataset runs DotBCELoss held out and
+        # logs eval_loss. Add EmbeddingSimilarityEvaluator(main_similarity=
+        # SimilarityFunction.DOT_PRODUCT) if you want Spearman too, but it
+        # ignores `prompts`, so bake the prefixes into the strings first.
+        eval_dataset=split["test"],
         loss=DotBCELoss(model),
         args=SentenceTransformerTrainingArguments(
             num_train_epochs=args.epochs,
@@ -140,20 +110,16 @@ def main():
             lr_scheduler_type="linear",
             logging_steps=10,
             prompts=PROMPTS,
-            bf16=is_bf16_supported(),
-            report_to="none",
+            learning_rate_mapping={r"beta": 1e-2},
+            bf16=torch.cuda.is_bf16_supported(),
+            report_to="tensorboard",
             output_dir="finetune/output",
-            # ponytail: no eval_strategy -- the only honest eval set is the 150
-            # hand-labelled pairs, and running it every N steps would invite
-            # picking the checkpoint that happens to score best on them.
+            eval_strategy = "steps",
+            eval_steps = 5,
         ),
     ).train()
 
-    print("\n=== fine-tuned ===")
-    be.report(score(model, gloss, descs), truth, len(names))
-
     model.save_pretrained(args.out)
-    model.tokenizer.save_pretrained(args.out)
     print(f"\nLoRA adapters -> {args.out}")
 
 

@@ -3,11 +3,11 @@
     urad dal -> urad dal - split black lentil, South Asian pulse, sold dried
 
 A 300m encoder cannot know what "urad dal" is; the gloss is cheaper than any
-amount of fine-tuning (see store_matching.md). Expansions are cached in
+amount of fine-tuning (see the README). Expansions are cached in
 ingredient_expansions, keyed by ingredient id, so a rerun costs nothing.
 
     llama serve --models-preset probes/models.ini     # in another terminal
-    uv run python ingredient_expand.py
+    uv run python scripts/ingredient_expand.py
 
 Every uncached row in the ingredients table, committed one at a time so an
 interrupted run keeps what it already paid for.
