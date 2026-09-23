@@ -10,7 +10,7 @@ Trader Joe's: Mid-sized national chain with a deliberately small, mostly private
 
 Target: General merchandise big-box store with a grocery section. Mainstream national brands, standard produce, dairy and pantry staples. No meaningful international or specialty selection.
 
-Seward Coop. High priced food co-op. Good for bulk items (nuts, seeds, baking ingredients) and specialty vegan products. 
+Seward Coop: High priced food co-op. Good for bulk items (nuts, seeds, baking ingredients) and specialty vegan products. 
 
 Costco: Warehouse club selling in bulk only. Large cuts of meat, big bags of rice and flour, cheese wheels, olive oil by the gallon. Nothing in a small package, no specialty ingredients, limited produce variety but cheap per pound.
 
