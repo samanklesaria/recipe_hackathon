@@ -4,28 +4,22 @@ Blank lines are separators, not entries. Re-runnable: description is UNIQUE, so
 already-loaded stores are skipped rather than duplicated.
 """
 
-import argparse
-
 import duckdb
+import fire
 
 
-def main():
-    ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--db", default="recipes.db")
-    ap.add_argument("--src", default="finetune/grocery_store_examples.md")
-    args = ap.parse_args()
-
-    with open(args.src) as f:
+def main(db="recipes.db", src="finetune/grocery_store_examples.md"):
+    with open(src) as f:
         stores = [line.strip() for line in f if line.strip()]
 
-    con = duckdb.connect(args.db)
+    con = duckdb.connect(db)
     con.executemany(
         "insert into training_stores (description) values (?) on conflict do nothing",
         [(s,) for s in stores],
     )
     con.close()
-    print(f"{len(stores)} lines from {args.src} -> {args.db}")
+    print(f"{len(stores)} lines from {src} -> {db}")
 
 
 if __name__ == "__main__":
-    main()
+    fire.Fire(main)

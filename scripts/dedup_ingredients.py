@@ -11,12 +11,12 @@ own often enough to look canonical:
 Writes the proposed merges to CSV. Eyeball them, then apply.
 """
 
-import argparse
 import csv
 from functools import cache
 from itertools import combinations
 
 import duckdb
+import fire
 import spacy
 
 # The knob. Higher = fewer, safer merges. Tune against the CSV.
@@ -108,16 +108,10 @@ def apply_merges(con, merges):
     return len(pairs)
 
 
-def main():
-    ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--db", default="recipes.db")
-    ap.add_argument("--out", default="ingredient_merges.csv")
-    ap.add_argument("--min-uses", type=int, default=MIN_CANONICAL_USES)
-    ap.add_argument("--apply", action="store_true",
-                    help="rewrite the database instead of writing the CSV")
-    args = ap.parse_args()
-
-    con = duckdb.connect(args.db, read_only=not args.apply)
+def main(db="recipes.db", out="ingredient_merges.csv", min_uses=MIN_CANONICAL_USES,
+         apply=False):
+    """Write the proposed merges to `out`, or --apply them to the database."""
+    con = duckdb.connect(db, read_only=not apply)
     rows = con.execute("""
         select i.id, i.description, count(ri.recipe_id) as uses
         from ingredients i
@@ -125,21 +119,21 @@ def main():
         group by i.id, i.description
     """).fetchall()
 
-    merges = find_merges(rows, args.min_uses)
+    merges = find_merges(rows, min_uses)
     merges.sort(key=lambda m: -m[0][2])
 
-    if args.apply:
-        print(f"{apply_merges(con, merges)} ingredients merged away in {args.db}")
+    if apply:
+        print(f"{apply_merges(con, merges)} ingredients merged away in {db}")
         return
 
-    with open(args.out, "w", newline="") as f:
+    with open(out, "w", newline="") as f:
         w = csv.writer(f)
         w.writerow(["alias_id", "alias", "alias_uses", "canonical_id", "canonical", "canonical_uses"])
         for alias, canon in merges:
             w.writerow([alias[0], alias[1], alias[2], canon[0], canon[1], canon[2]])
 
-    print(f"{len(merges)} merges out of {len(rows)} ingredients -> {args.out}")
+    print(f"{len(merges)} merges out of {len(rows)} ingredients -> {out}")
 
 
 if __name__ == "__main__":
-    main()
+    fire.Fire(main)

@@ -14,12 +14,11 @@ three are visible from the character count. No model required.
 Prints by default:
 
     uv run python scripts/anomalies.py
-    uv run python scripts/anomalies.py --delete
+    uv run python scripts/anomalies.py --delete-them
 """
 
-import argparse
-
 import duckdb
+import fire
 
 # Both cuts sit well past the real 99th percentile: recipe names run to ~70
 # characters, ingredients to ~85. Anything longer is prose that leaked in.
@@ -83,34 +82,30 @@ def delete(con, found):
     return len(recipes), len(ingredients)
 
 
-def main():
-    ap = argparse.ArgumentParser(description=__doc__,
-                                 formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--db", default="recipes.db")
-    ap.add_argument("--max-name", type=int, default=MAX_RECIPE_NAME)
-    ap.add_argument("--max-ingredient", type=int, default=MAX_INGREDIENT)
-    ap.add_argument("--limit", type=int, default=20, help="rows printed per category")
-    ap.add_argument("--delete", action="store_true",
-                    help="remove the flagged rows instead of printing them")
-    args = ap.parse_args()
+def main(db="recipes.db", max_name=MAX_RECIPE_NAME, max_ingredient=MAX_INGREDIENT,
+         limit=20, delete_them=False):
+    """Report the flagged rows.
 
-    con = duckdb.connect(args.db, read_only=not args.delete)
-    found = find(con, args.max_name, args.max_ingredient)
+    limit is rows printed per category; delete_them (--delete-them) removes
+    them instead.
+    """
+    con = duckdb.connect(db, read_only=not delete_them)
+    found = find(con, max_name, max_ingredient)
 
     for _, label, rows in found:
         print(f"\n{len(rows)} {label}")
-        for rid, text in rows[:args.limit]:
+        for rid, text in rows[:limit]:
             print(f"  {rid:>6}  {' '.join(text.split())[:100]}")
-        if len(rows) > args.limit:
-            print(f"  ... {len(rows) - args.limit} more")
+        if len(rows) > limit:
+            print(f"  ... {len(rows) - limit} more")
 
-    if args.delete:
+    if delete_them:
         r, i = delete(con, found)
-        print(f"\ndeleted {r} recipes and {i} ingredients from {args.db}")
+        print(f"\ndeleted {r} recipes and {i} ingredients from {db}")
     else:
-        print("\nnothing changed; pass --delete to remove these")
+        print("\nnothing changed; pass --delete-them to remove these")
     con.close()
 
 
 if __name__ == "__main__":
-    main()
+    fire.Fire(main)

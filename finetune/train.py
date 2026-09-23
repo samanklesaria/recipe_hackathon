@@ -1,8 +1,7 @@
 """Fine-tune embeddinggemma-300m into the two-tower store matcher.
 """
-import argparse
-
 import duckdb
+import fire
 import numpy as np
 import torch
 import torch.nn.functional as F
@@ -65,16 +64,8 @@ def score(model, gloss, descs):
     return np.asarray(ing) @ np.asarray(store).T
 
 
-def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--db", default=settings.DB)
-    ap.add_argument("--out", default=OUT)
-    ap.add_argument("--epochs", type=float, default=1)
-    ap.add_argument("--batch-size", type=int, default=32)
-    ap.add_argument("--lr", type=float, default=2e-5)
-    args = ap.parse_args()
-
-    split = load_training_data(args.db).train_test_split(
+def main(db=settings.DB, out=OUT, epochs=1.0, batch_size=32, lr=2e-5):
+    split = load_training_data(db).train_test_split(
         test_size=0.1, seed=3407)
 
     # Not unsloth: without bf16 (Turing) it keeps the base weights in fp16 and
@@ -103,9 +94,9 @@ def main():
         eval_dataset=split["test"],
         loss=DotBCELoss(model),
         args=SentenceTransformerTrainingArguments(
-            num_train_epochs=args.epochs,
-            per_device_train_batch_size=args.batch_size,
-            learning_rate=args.lr,
+            num_train_epochs=epochs,
+            per_device_train_batch_size=batch_size,
+            learning_rate=lr,
             warmup_ratio=0.03,
             lr_scheduler_type="linear",
             logging_steps=10,
@@ -119,9 +110,9 @@ def main():
         ),
     ).train()
 
-    model.save_pretrained(args.out)
-    print(f"\nLoRA adapters -> {args.out}")
+    model.save_pretrained(out)
+    print(f"\nLoRA adapters -> {out}")
 
 
 if __name__ == "__main__":
-    main()
+    fire.Fire(main)
