@@ -38,12 +38,34 @@ CREATE TABLE ingredient_expansions (
     expansion VARCHAR NOT NULL
 );
 
+-- The store matcher's vector for an ingredient's gloss, written by plan.py the
+-- first time that ingredient turns up on a list. A missing row means "not
+-- embedded yet"; empty the table to force a recompute after a new fine-tune or
+-- a change to RECIPE_EMBED_BETA. Its own table, not a column on ingredients:
+-- DuckDB will not UPDATE a row that a foreign key still points at.
+CREATE TABLE ingredient_embeddings (
+    ingredient_id INTEGER PRIMARY KEY REFERENCES ingredients(id),
+    embedding FLOAT[768] NOT NULL
+);
+
 -- Synthetic store descriptions for the store-matching fine-tune
 CREATE SEQUENCE IF NOT EXISTS training_stores_id_seq;
 
 CREATE TABLE training_stores (
     id INTEGER PRIMARY KEY DEFAULT nextval('training_stores_id_seq'),
     description VARCHAR NOT NULL UNIQUE
+);
+
+-- The user's actual grocery stores, one description per line, edited in the GUI
+CREATE SEQUENCE IF NOT EXISTS stores_id_seq;
+
+-- priority is the line's position in that tab: 0 first, and first wins when
+-- more than one store can stock an ingredient.
+CREATE TABLE stores (
+    id INTEGER PRIMARY KEY DEFAULT nextval('stores_id_seq'),
+    description VARCHAR NOT NULL UNIQUE,
+    priority INTEGER NOT NULL,
+    embedding FLOAT[768]
 );
 
 -- One (ingredient, store) pair with the LLM's ordinal guess at how often that

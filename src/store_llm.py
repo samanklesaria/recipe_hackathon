@@ -1,21 +1,26 @@
 import settings
 import numpy as np
 import requests
+from scipy.special import expit
 
 # Embedding Model
 ING_PREFIX = "task: search result | query: "
 STORE_PREFIX = "title: none | text: "
 
 def embed(texts):
+    """(x / ||x||) * ||x||**beta, as finetune's ScaledNormalize computes it.
+
+    The GGUF cannot carry beta, so ask llama-server for the raw (post-Dense)
+    embedding and apply it here. beta = 0 is plain L2 normalization.
+    """
     r = requests.post(f"{settings.SERVER}/v1/embeddings", timeout=600,
-                      json={"model": settings.EMBED_MODEL, "input": texts})
+                      json={"model": settings.EMBED_MODEL, "input": texts,
+                            "embd_normalize": -1})
     r.raise_for_status()
     data = sorted(r.json()["data"], key=lambda d: d["index"])
-    return np.array([d["embedding"] for d in data])
-
-def logits_from_embedding(glosses, stores):
-    return embed([ING_PREFIX + g for g in glosses]) @ \
-        embed([STORE_PREFIX + s for s in stores]).T
+    x = np.array([d["embedding"] for d in data])
+    n = np.linalg.norm(x, axis=-1, keepdims=True)
+    return x * n ** (settings.EMBED_BETA - 1)
 
 # LLM (distilled into embedding model)
 GRAMMAR = r"""

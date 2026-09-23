@@ -33,6 +33,8 @@ Everything after `book_loader.sh` is re-runnable and resumes where it stopped.
 `ingredient_expand.py` and `generate_teaching_data.py` want llama-server;
 `train.py` wants a GPU and does not.
 
+To migrate and old database to a new schema, use [winged migration](https://github.com/samanklesaria/winged_migration).
+
 **Extraction.** `src/epub_extract.py` takes recipe boundaries from the epub's own
 table of contents: leaf entries mark recipes, the unit of text is the spine
 document or the slice between two anchors. Books with only chapter-level
@@ -91,13 +93,13 @@ is noted in the schema.
 uv run pytest
 ```
 
-## Future work: a GUI
+## Future work
 
-A PyQt GUI will eventually:
-
-- Allow you to add cookbooks incrementally rather than all at once
-- Allow you to pin the sampled recipes you like and re-sample the rest
-- Open the chosen recipes in your default epub reader on double click.
+- Parsing epubs needs debugging.
+- LLM guesses about ingredient availability aren't perfect. Fine tune on manually created data as well as stores with explicit instructions (e.g. "does not stock fish or meat"). 
+- The GUI should allow you to add cookbooks incrementally rather than all at once
+- The GUI should allow you to pin the sampled recipes you like and re-sample the rest
+- The GUI should open the chosen recipes in your default epub reader on double click.
 
 There will also be a grocery list view iOS app for use while grocery shopping
 - This should sync to the PyQt GUI and among other shoppers in the family.

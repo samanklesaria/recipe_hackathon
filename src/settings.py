@@ -19,4 +19,5 @@ def _env(name):
 SERVER = _env("RECIPE_SERVER")
 CHAT_MODEL = _env("RECIPE_CHAT_MODEL")
 EMBED_MODEL = _env("RECIPE_EMBED_MODEL")
+EMBED_BETA = float(_env("RECIPE_EMBED_BETA"))
 DB = _env("RECIPE_DB")

@@ -9,6 +9,7 @@ from collections import defaultdict
 from typing import NamedTuple
 
 import duckdb
+import numpy as np
 
 import settings
 import store_llm
@@ -41,46 +42,62 @@ THRESHOLD = 0.0
 # An ingredient with no gloss yet falls back to its bare name rather than
 # dropping off the shopping list.
 INGREDIENTS = """
-SELECT DISTINCT i.description, coalesce(e.expansion, i.description)
+SELECT DISTINCT i.id, i.description, coalesce(e.expansion, i.description),
+       v.embedding
 FROM recipe_ingredients ri
 JOIN ingredients i ON i.id = ri.ingredient_id
 LEFT JOIN ingredient_expansions e ON e.ingredient_id = i.id
+LEFT JOIN ingredient_embeddings v ON v.ingredient_id = i.id
 WHERE ri.recipe_id IN (SELECT unnest(?))
-ORDER BY 1
+ORDER BY 2
 """
 
 
-def shopping_plan(n=5, db=None, stores=None, threshold=THRESHOLD,
-                  logits=store_llm.logits_from_embedding):
+def shopping_plan(n=5, db=None, threshold=THRESHOLD, embed=store_llm.embed):
     """Plan n dinners and assign every ingredient they need to one store.
 
     An ingredient whose best store still scores below threshold lands under
     None rather than being sent to the least-bad option.
 
-    stores defaults to the training_stores table; pass your own descriptions
-    once you have a real list. logits is injectable for tests.
+    Stores and their embeddings come from the stores table, written by the GUI.
+    Ingredient embeddings are filled in here, once, the first time an
+    ingredient turns up. embed is injectable for tests.
     """
-    con = duckdb.connect(db or settings.DB, read_only=True)
+    con = duckdb.connect(db or settings.DB)
     try:
         recipes = [Recipe(rid, name, cooktime, is_side, for_recipe, ingredients or [])
                    for rid, name, cooktime, is_side, for_recipe, ingredients
                    in con.execute("SELECT * FROM plan_week(?)", [n]).fetchall()]
         if not recipes:
             return Plan([], {})
-        if stores is None:
-            stores = [s for (s,) in con.execute(
-                "SELECT description FROM training_stores ORDER BY id").fetchall()]
+        # a store with no embedding was never saved through the GUI; it cannot
+        # be scored, so it is not offered
+        shops = con.execute(
+            "SELECT description, embedding FROM stores"
+            " WHERE embedding IS NOT NULL ORDER BY priority").fetchall()
         rows = con.execute(INGREDIENTS, [[r.id for r in recipes]]).fetchall()
+
+        missing = [i for i, r in enumerate(rows) if r[3] is None]
+        if missing:
+            fresh = embed([store_llm.ING_PREFIX + rows[i][2] for i in missing])
+            con.executemany("INSERT INTO ingredient_embeddings VALUES (?, ?)",
+                            [(rows[i][0], [float(x) for x in v])
+                             for i, v in zip(missing, fresh)])
+            for i, v in zip(missing, fresh):
+                rows[i] = (*rows[i][:3], v)
     finally:
         con.close()
 
-    if not rows or not stores:
+    if not rows or not shops:
         return Plan(recipes, {})
 
-    scores = logits([r[1] for r in rows], stores)
-    best = scores.argmax(axis=1)
+    stores = [s for s, _ in shops]
+    scores = np.array([r[3] for r in rows]) @ np.array([v for _, v in shops]).T
 
     by_store = defaultdict(list)
-    for (name, _), j, row in zip(rows, best, scores):
-        by_store[stores[j] if row[j] >= threshold else None].append(name)
+    for (_, name, _, _), row in zip(rows, scores):
+        # stores is already in priority order, so the first one that can stock
+        # it takes it -- fewer trips beats a slightly better match.
+        pick = next((s for s, v in zip(stores, row) if v >= threshold), None)
+        by_store[pick].append(name)
     return Plan(recipes, dict(by_store))

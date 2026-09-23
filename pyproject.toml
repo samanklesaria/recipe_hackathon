@@ -14,6 +14,7 @@ dependencies = [
     "en-core-web-sm",
     "sentence-transformers>=6.1.0",
     "tensorboard>=2.21.0",
+    "pyqt6>=6.11.0",
 ]
 
 [dependency-groups]
