@@ -8,6 +8,7 @@ beta cannot go in the GGUF -- llama.cpp's graph has no op that reads it -- so
 it is printed for the client to apply: serve unnormalized embeddings and scale
 them by ||x|| ** (beta - 1).
 """
+# pyright: basic
 import json
 import shutil
 import subprocess

@@ -19,17 +19,6 @@ CREATE TABLE recipes (
     is_side BOOLEAN NOT NULL DEFAULT FALSE
 );
 
--- expansion is a one-line gloss ("urad dal - split black lentil, South Asian
--- pulse, sold dried"), written by ingredient_expand.py; it is what the store
--- matcher embeds, since a 300m encoder cannot tell what "urad dal" is on its
--- own. embedding is that gloss's vector, written by plan.py the first time the
--- ingredient turns up on a list. NULL in either means "not done yet"; null the
--- embedding column to force a recompute after a new fine-tune or a change to
--- RECIPE_EMBED_BETA.
--- ponytail: nothing declares a foreign key into this table, on purpose --
--- DuckDB will not UPDATE a row that a foreign key still points at, and these
--- two columns are written by UPDATE. Child rows are cleaned up by hand in
--- anomalies.py and dedup_ingredients.py, which is where the deletes live.
 CREATE TABLE ingredients (
     id INTEGER PRIMARY KEY DEFAULT nextval('ingredients_id_seq'),
     description VARCHAR NOT NULL UNIQUE,
@@ -97,7 +86,6 @@ CREATE INDEX idx_recipe_requires_requires ON recipe_requires(requires_id);
 CREATE INDEX idx_recipe_pairings_paired ON recipe_pairings(paired_id);
 
 -- One draw from Beta(a, b), used for Thompson sampling over recipe goodness.
--- ponytail: normal approximation via Box-Muller, not a real Beta sampler --
 -- DuckDB has no gamma variate. It is visibly wrong only when a or b is below
 -- ~1 (we always pass counts+1, so never) and slightly over-confident in the
 -- tails. Swap for a UDF if the ranking ever looks off.
@@ -166,10 +154,7 @@ CREATE OR REPLACE MACRO plan_week(n) AS TABLE (
     JOIN recipes r ON r.id = pl.recipe_id
 );
 
--- Every distinct ingredient a set of recipes needs, with the string the store
--- matcher embeds. The gloss is what the fine-tune trained on; an ingredient
--- with no gloss yet falls back to its bare name rather than dropping off the
--- shopping list. embedding is NULL until plan.py fills it in.
+-- Every distinct ingredient a set of recipes needs
 CREATE OR REPLACE MACRO plan_ingredients(ids) AS TABLE (
     SELECT DISTINCT i.id, i.description,
            coalesce(i.expansion, i.description) AS gloss,

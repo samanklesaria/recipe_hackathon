@@ -1,9 +1,5 @@
 """Shared configuration, read from the environment at import.
-
-The values live in .envrc; run `direnv allow` once and every script picks them
-up. Deliberately no fallback defaults -- a default here would be a second place
-for the server url to drift out of date, and a typo'd env name would silently
-keep working against the wrong one.
+The values live in .envrc; run `direnv allow` once and every script picks them up.
 """
 import os
 

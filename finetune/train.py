@@ -1,9 +1,9 @@
 """Fine-tune embeddinggemma-300m into the two-tower store matcher.
 """
+# pyright: basic
 import csv
 import duckdb
 import fire
-import numpy as np
 import torch
 import torch.nn.functional as F
 from datasets import Dataset
@@ -26,8 +26,6 @@ EXPLICIT_CSV = "finetune/explicit_store_examples.csv"
 # top, PROBS words in the cells.
 EVAL_CSV = "finetune/eval_pairs.csv"
 
-# The gloss, not the raw ingredient string -- a 300m encoder cannot tell what
-# "urad dal" is, and the eval side embeds the gloss too.
 SQL = """
 SELECT i.expansion, s.description, d.label
 FROM embed_training_data d
@@ -68,7 +66,6 @@ def load_explicit_data(path):
     ds = Dataset.from_csv(path)
     return ds.map(
         lambda r: {"ingredient": r["item"], "store": r["store"],
-                   # same ceiling as PROBS: hard 0/1 targets send logits to inf
                    "label": PROBS["always"] if r["has"] else PROBS["never"]},
         remove_columns=ds.column_names)
 
@@ -99,15 +96,6 @@ def load_eval_pairs(db, path=EVAL_CSV):
             out["label"].append(PROBS[label])
     return Dataset.from_dict(out)
 
-
-def score(model, gloss, descs):
-    """The (ingredient, store) logit matrix, scored the way training does."""
-    with torch.no_grad():
-        ing = model.encode(gloss, prompt=PROMPTS["ingredient"])
-        store = model.encode(descs, prompt=PROMPTS["store"])
-    return np.asarray(ing) @ np.asarray(store).T
-
-
 def main(db=settings.DB, out=OUT, epochs=1.0, batch_size=32, lr=2e-5):
     split = load_training_data(db).train_test_split(
         test_size=0.1, seed=3407)
@@ -135,10 +123,6 @@ def main(db=settings.DB, out=OUT, epochs=1.0, batch_size=32, lr=2e-5):
         model=model,
         train_dataset={"db": split["train"], "explicit": explicit["train"],
                        "checked": checked["train"]},
-        # ponytail: no evaluator -- eval_dataset runs DotBCELoss held out and
-        # logs eval_loss. Add EmbeddingSimilarityEvaluator(main_similarity=
-        # SimilarityFunction.DOT_PRODUCT) if you want Spearman too, but it
-        # ignores `prompts`, so bake the prefixes into the strings first.
         eval_dataset={"db": split["test"], "explicit": explicit["test"],
                       "checked": checked["test"]},
         loss=DotBCELoss(model),

@@ -9,7 +9,6 @@ import numpy as np
 import settings
 import store_llm
 
-
 class Recipe(NamedTuple):
     id: int
     name: str
@@ -25,18 +24,11 @@ class Plan(NamedTuple):
     # scored above the threshold on: order it, or go find it yourself.
     by_store: dict[str | None, list[str]]
 
-
-
 def shopping_plan(n=5, db=None, threshold=0.6899744811276125, embed=store_llm.embed):
     """Plan n dinners and assign every ingredient they need to one store.
-
     An ingredient whose best store still scores below threshold lands under
     None rather than being sent to the least-bad option.
-
-    Stores and their embeddings come from the stores table, written by the GUI.
-    Ingredient embeddings are filled in here, once, the first time an
-    ingredient turns up. embed is injectable for tests.
-    """
+"""
     con = duckdb.connect(db or settings.DB)
     try:
         recipes = [Recipe(rid, name, cooktime, is_side, for_recipe, ingredients or [])
