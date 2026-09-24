@@ -77,15 +77,11 @@ def load_eval_pairs(db, path=EVAL_CSV):
     """The wide hand-checked grid, melted into the same three columns.
 
     Columns are store *names*; training_stores stores the whole "Name: blurb"
-    line, so match on the leading name. Not a plain split(":") -- some rows
-    separate the name with a period instead.
+    line, so match on the part before the colon.
     """
     con = duckdb.connect(db, read_only=True)
-    rows = [d for (d,) in con.execute(
-        "SELECT description FROM training_stores").fetchall()]
-    descs = {d[:i]: d for d in rows
-             for i in [min((d.find(c) for c in ":." if c in d), default=-1)]
-             if i > 0}
+    descs = {d.split(":")[0]: d for (d,) in con.execute(
+        "SELECT description FROM training_stores").fetchall()}
     glosses = dict(con.execute(
         "SELECT i.description, e.expansion FROM ingredients i"
         " JOIN ingredient_expansions e ON e.ingredient_id = i.id").fetchall())
