@@ -94,13 +94,14 @@ uv run pytest
 ```
 
 ## Future work
+- Allow removing items from ingredients list that we already have. 
 - Flag vegetarian and vegan recipes. 
 - Within a grocery store, sort into produce, dairy, cans & bottles, frozen, other-refrigerated. Or we could just cluster the embeddings.
 - Over-sample hard cases (nearby but different labels) when building embedding model.
 - Parsing epubs needs debugging.
 - The GUI should allow you to add cookbooks incrementally rather than all at once
 - The GUI should allow you to pin the sampled recipes you like and re-sample the rest
-- The GUI should open the chosen recipes in your default epub reader on double click.
+- Bug: opening in Calibre jumps to the book start after a pause. 
 - Should look over generated training data to catch obvious errors.
 - Remove desserts, appetizers, side salads.
 - Think about how this could be released more generally. 

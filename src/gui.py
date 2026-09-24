@@ -6,6 +6,9 @@ Both views are rendered as HTML into a read-only QTextBrowser: the content is a
 document, not a form, and a document is one setHtml call instead of a tree of
 widgets to keep in sync.
 """
+import os
+import shutil
+import subprocess
 import sys
 from collections import defaultdict
 from html import escape
@@ -29,16 +32,26 @@ CSS = """
 """
 
 
+BOOKS = "example_cookbooks"
+
+
 def menu_html(plan):
-    """Just the titles: one bullet per main, its sides named alongside."""
+    """Just the titles: one bullet per main, its sides named alongside.
+
+    Each title links to recipe:<id>; Window.open_recipe turns that into a
+    Calibre viewer opened at the recipe's ToC entry.
+    """
     kids = defaultdict(list)
     for r in plan.recipes:
         if r.for_recipe is not None:
             kids[r.for_recipe].append(r)
 
+    def link(r):
+        return f'<a href="recipe:{r.id}"><b>{escape(r.name)}</b></a>'
+
     def line(r):
-        sides = " and ".join(f"<b>{escape(k.name)}</b>" for k in kids[r.id])
-        return f"<li><b>{escape(r.name)}</b>" + (f" with {sides}" if sides else "") + "</li>"
+        sides = " and ".join(link(k) for k in kids[r.id])
+        return f"<li>{link(r)}" + (f" with {sides}" if sides else "") + "</li>"
 
     mains = [r for r in plan.recipes if r.for_recipe is None]
     if not mains:
@@ -55,6 +68,15 @@ def list_html(plan):
         out.append(f"<h2>{escape(name)}</h2><p>"
                    + "<br>".join(escape(i) for i in sorted(items)) + "</p>")
     return CSS + ("".join(out) or "<p>Nothing to buy.</p>")
+
+
+def sources(ids):
+    """id -> (epub path, ToC href), for the recipes we know where to find."""
+    with duckdb.connect(settings.DB, read_only=True) as con:
+        rows = con.execute(
+            "select id, filename, anchor from recipes where id in (select unnest(?))"
+            " and filename is not null and anchor is not null", [list(ids)]).fetchall()
+    return {rid: (os.path.join(BOOKS, fn), anchor) for rid, fn, anchor in rows}
 
 
 def _stored():
@@ -96,6 +118,9 @@ class Window(QMainWindow):
         super().__init__()
         self.setWindowTitle("Dinner")
         self.menu = QTextBrowser()
+        self.menu.setOpenLinks(False)
+        self.menu.anchorClicked.connect(self.open_recipe)
+        self.sources = {}
         self.shopping = QTextBrowser()
 
         button = QPushButton("Generate")
@@ -121,9 +146,30 @@ class Window(QMainWindow):
         save_stores(self.stores.toPlainText())
         super().closeEvent(event)
 
+    def open_recipe(self, url):
+        """toc-href is an exact match on the book's own ToC href, which is
+        exactly what epub_extract stored as the anchor.
+
+        Launched through `open`, not by running the ebook-viewer binary: a
+        Chromium helper spawned into our process coalition aborts its sandbox
+        and the viewer dies with "Render process crashed". `open` hands the job
+        to launchd, which starts it in a coalition of its own. Hence the
+        absolute book path too, since launchd has no working directory of ours.
+        """
+        found = self.sources.get(int(url.toString().removeprefix("recipe:")))
+        viewer = shutil.which("ebook-viewer")
+        if not (found and viewer):
+            return
+        path, anchor = found
+        app = os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(viewer))),
+                           "ebook-viewer.app")
+        subprocess.Popen(["open", "-a", app, "--args",
+                          "--open-at", "toc-href:" + anchor, os.path.abspath(path)])
+
     def generate(self):
         save_stores(self.stores.toPlainText())
         plan = planner.shopping_plan()
+        self.sources = sources([r.id for r in plan.recipes])
         self.menu.setHtml(menu_html(plan))
         self.shopping.setHtml(list_html(plan))
 
