@@ -1,9 +1,4 @@
 """A week of dinners, plus the shopping list split up by which store to visit.
-
-Library only: the GUI calls shopping_plan() and renders what comes back. The
-recipe half is recipes.sql's plan_week macro; the store half is the two-tower
-dot product from finetune/train.py, each ingredient going to whichever store
-scores highest.
 """
 from collections import defaultdict
 from typing import NamedTuple
@@ -31,29 +26,8 @@ class Plan(NamedTuple):
     by_store: dict[str | None, list[str]]
 
 
-# The dot product is a logit trained against BCE, so 0 is p = 0.5: no store is
-# more likely to stock it than not. ponytail: a fixed cut, not a calibration --
-# the labels are an LLM's guess to begin with, so there is nothing to calibrate
-# against until someone comes home empty-handed and says so.
-THRESHOLD = 0.0
 
-
-# The gloss is what gets embedded, the same string the fine-tune trained on.
-# An ingredient with no gloss yet falls back to its bare name rather than
-# dropping off the shopping list.
-INGREDIENTS = """
-SELECT DISTINCT i.id, i.description, coalesce(e.expansion, i.description),
-       v.embedding
-FROM recipe_ingredients ri
-JOIN ingredients i ON i.id = ri.ingredient_id
-LEFT JOIN ingredient_expansions e ON e.ingredient_id = i.id
-LEFT JOIN ingredient_embeddings v ON v.ingredient_id = i.id
-WHERE ri.recipe_id IN (SELECT unnest(?))
-ORDER BY 2
-"""
-
-
-def shopping_plan(n=5, db=None, threshold=THRESHOLD, embed=store_llm.embed):
+def shopping_plan(n=5, db=None, threshold=0.6899744811276125, embed=store_llm.embed):
     """Plan n dinners and assign every ingredient they need to one store.
 
     An ingredient whose best store still scores below threshold lands under
@@ -75,13 +49,14 @@ def shopping_plan(n=5, db=None, threshold=THRESHOLD, embed=store_llm.embed):
         shops = con.execute(
             "SELECT description, embedding FROM stores"
             " WHERE embedding IS NOT NULL ORDER BY priority").fetchall()
-        rows = con.execute(INGREDIENTS, [[r.id for r in recipes]]).fetchall()
+        rows = con.execute("SELECT * FROM plan_ingredients(?)",
+                           [[r.id for r in recipes]]).fetchall()
 
         missing = [i for i, r in enumerate(rows) if r[3] is None]
         if missing:
             fresh = embed([store_llm.ING_PREFIX + rows[i][2] for i in missing])
-            con.executemany("INSERT INTO ingredient_embeddings VALUES (?, ?)",
-                            [(rows[i][0], [float(x) for x in v])
+            con.executemany("UPDATE ingredients SET embedding = ? WHERE id = ?",
+                            [([float(x) for x in v], rows[i][0])
                              for i, v in zip(missing, fresh)])
             for i, v in zip(missing, fresh):
                 rows[i] = (*rows[i][:3], v)

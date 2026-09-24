@@ -19,33 +19,28 @@ CREATE TABLE recipes (
     is_side BOOLEAN NOT NULL DEFAULT FALSE
 );
 
+-- expansion is a one-line gloss ("urad dal - split black lentil, South Asian
+-- pulse, sold dried"), written by ingredient_expand.py; it is what the store
+-- matcher embeds, since a 300m encoder cannot tell what "urad dal" is on its
+-- own. embedding is that gloss's vector, written by plan.py the first time the
+-- ingredient turns up on a list. NULL in either means "not done yet"; null the
+-- embedding column to force a recompute after a new fine-tune or a change to
+-- RECIPE_EMBED_BETA.
+-- ponytail: nothing declares a foreign key into this table, on purpose --
+-- DuckDB will not UPDATE a row that a foreign key still points at, and these
+-- two columns are written by UPDATE. Child rows are cleaned up by hand in
+-- anomalies.py and dedup_ingredients.py, which is where the deletes live.
 CREATE TABLE ingredients (
     id INTEGER PRIMARY KEY DEFAULT nextval('ingredients_id_seq'),
-    description VARCHAR NOT NULL UNIQUE
+    description VARCHAR NOT NULL UNIQUE,
+    expansion VARCHAR,
+    embedding FLOAT[768]
 );
 
 CREATE TABLE recipe_ingredients (
     recipe_id INTEGER NOT NULL REFERENCES recipes(id),
-    ingredient_id INTEGER NOT NULL REFERENCES ingredients(id),
+    ingredient_id INTEGER NOT NULL,
     quantity VARCHAR
-);
-
--- One-line gloss of an ingredient ("urad dal - split black lentil, South Asian
--- pulse, sold dried"), written by ingredient_expand.py. It is what the store
--- matcher embeds: a 300m encoder cannot tell what "urad dal" is on its own.
-CREATE TABLE ingredient_expansions (
-    ingredient_id INTEGER PRIMARY KEY REFERENCES ingredients(id),
-    expansion VARCHAR NOT NULL
-);
-
--- The store matcher's vector for an ingredient's gloss, written by plan.py the
--- first time that ingredient turns up on a list. A missing row means "not
--- embedded yet"; empty the table to force a recompute after a new fine-tune or
--- a change to RECIPE_EMBED_BETA. Its own table, not a column on ingredients:
--- DuckDB will not UPDATE a row that a foreign key still points at.
-CREATE TABLE ingredient_embeddings (
-    ingredient_id INTEGER PRIMARY KEY REFERENCES ingredients(id),
-    embedding FLOAT[768] NOT NULL
 );
 
 -- Synthetic store descriptions for the store-matching fine-tune
@@ -73,7 +68,7 @@ CREATE TABLE stores (
 -- word, not the probability -- the word is what the GBNF grammar emits and the
 -- word -> p mapping is a modelling choice that belongs in the training script.
 CREATE TABLE embed_training_data (
-    ingredient_id INTEGER NOT NULL REFERENCES ingredients(id),
+    ingredient_id INTEGER NOT NULL,
     training_store_id INTEGER NOT NULL REFERENCES training_stores(id),
     label VARCHAR NOT NULL,
     PRIMARY KEY (ingredient_id, training_store_id)
@@ -169,4 +164,18 @@ CREATE OR REPLACE MACRO plan_week(n) AS TABLE (
          WHERE ri.recipe_id = pl.recipe_id) AS ingredients
     FROM everything pl
     JOIN recipes r ON r.id = pl.recipe_id
+);
+
+-- Every distinct ingredient a set of recipes needs, with the string the store
+-- matcher embeds. The gloss is what the fine-tune trained on; an ingredient
+-- with no gloss yet falls back to its bare name rather than dropping off the
+-- shopping list. embedding is NULL until plan.py fills it in.
+CREATE OR REPLACE MACRO plan_ingredients(ids) AS TABLE (
+    SELECT DISTINCT i.id, i.description,
+           coalesce(i.expansion, i.description) AS gloss,
+           i.embedding
+    FROM recipe_ingredients ri
+    JOIN ingredients i ON i.id = ri.ingredient_id
+    WHERE ri.recipe_id IN (SELECT unnest(ids))
+    ORDER BY i.description
 );

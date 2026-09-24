@@ -28,16 +28,13 @@ def test_resolve_chain():
 def test_apply_merges():
     con = duckdb.connect()
     con.execute("""
-        create table ingredients (id integer primary key, description varchar);
-        create table ingredient_expansions (ingredient_id integer primary key, expansion varchar);
+        create table ingredients (id integer primary key, description varchar, expansion varchar);
         create table recipe_ingredients (recipe_id integer, ingredient_id integer, quantity varchar);
-        insert into ingredients values (1, 'bacon'), (2, 'crispy bacon');
-        insert into ingredient_expansions values (2, 'bacon, but crispy');
+        insert into ingredients values (1, 'bacon', null), (2, 'crispy bacon', 'bacon, but crispy');
         insert into recipe_ingredients values (7, 1, '2 slices'), (7, 2, '2 slices'), (8, 2, '1 lb');
     """)
     apply_merges(con, [((2, "crispy bacon", 2), (1, "bacon", 40))])
     assert con.execute("select id, description from ingredients").fetchall() == [(1, "bacon")]
-    assert con.execute("select * from ingredient_expansions").fetchall() == []
     assert sorted(con.execute("select * from recipe_ingredients").fetchall()) == [
         (7, 1, "2 slices"), (8, 1, "1 lb")  # the duplicated row collapsed
     ]

@@ -20,7 +20,7 @@ from peft import PeftModel
 from sentence_transformers import SentenceTransformer
 from transformers import AutoModel
 
-LORA = "finetune/embeddinggemma_store_lora"
+LORA = "finetune/embedding_store_lora"
 
 
 def main(llama_cpp, lora=LORA, merged="finetune/embeddinggemma_store_merged",

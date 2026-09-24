@@ -19,10 +19,11 @@ import settings
 from store_llm import label_store
 
 MISSING = """
-SELECT e.ingredient_id, e.expansion FROM ingredient_expansions e
+SELECT i.id, i.expansion FROM ingredients i
 ANTI JOIN embed_training_data d
-  ON d.ingredient_id = e.ingredient_id AND d.training_store_id = ?
-ORDER BY e.expansion
+  ON d.ingredient_id = i.id AND d.training_store_id = ?
+WHERE i.expansion IS NOT NULL
+ORDER BY i.expansion
 """
 
 

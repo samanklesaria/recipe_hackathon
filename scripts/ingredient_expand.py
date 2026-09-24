@@ -4,7 +4,7 @@
 
 A 300m encoder cannot know what "urad dal" is; the gloss is cheaper than any
 amount of fine-tuning (see the README). Expansions are cached in
-ingredient_expansions, keyed by ingredient id, so a rerun costs nothing.
+ingredients.expansion, so a rerun costs nothing.
 
     llama serve --models-preset probes/models.ini     # in another terminal
     uv run python scripts/ingredient_expand.py
@@ -56,9 +56,8 @@ def expand(ingredient):
 def main():
     con = duckdb.connect(settings.DB)
     rows = con.execute(
-        "SELECT i.id, i.description FROM ingredients i "
-        "ANTI JOIN ingredient_expansions e ON e.ingredient_id = i.id "
-        "ORDER BY i.description").fetchall()
+        "SELECT id, description FROM ingredients WHERE expansion IS NULL "
+        "ORDER BY description").fetchall()
 
     done = 0
     for ing_id, desc in rows:
@@ -67,13 +66,13 @@ def main():
         except Exception as e:
             print(f"  {desc}: {type(e).__name__}: {e}", file=sys.stderr, flush=True)
             continue
-        con.execute("INSERT INTO ingredient_expansions VALUES (?, ?)", (ing_id, text))
+        con.execute("UPDATE ingredients SET expansion = ? WHERE id = ?", (text, ing_id))
         con.commit()
         done += 1
         print(text, flush=True)
 
     con.close()
-    print(f"\n{done}/{len(rows)} expanded -> {settings.DB}:ingredient_expansions")
+    print(f"\n{done}/{len(rows)} expanded -> {settings.DB}:ingredients.expansion")
 
 
 if __name__ == "__main__":

@@ -25,8 +25,8 @@ def db(tmp_path, store_vecs=(vec(1, -1), vec(-1, 1))):
         INSERT INTO recipes (id, name, upvotes, is_side) VALUES
             (1, 'dal', 10, FALSE), (2, 'raita', 5, TRUE);
         INSERT INTO recipe_pairings VALUES (1, 2);
-        INSERT INTO ingredients (id, description) VALUES (1, 'urad dal'), (2, 'yogurt');
-        INSERT INTO ingredient_expansions VALUES (1, 'urad dal - split black lentil');
+        INSERT INTO ingredients (id, description, expansion) VALUES
+            (1, 'urad dal', 'urad dal - split black lentil'), (2, 'yogurt', NULL);
         INSERT INTO recipe_ingredients VALUES (1, 1, '1 cup'), (2, 2, NULL);
     """)
     con.executemany(
@@ -50,7 +50,7 @@ def test_splits_the_list_by_store(tmp_path):
 
 
 def test_ungloss_ingredient_still_gets_a_store(tmp_path):
-    # yogurt has no ingredient_expansions row; it must not vanish
+    # yogurt has no expansion; it must not vanish
     seen = []
     plan = shopping_plan(2, db=db(tmp_path),
                          embed=lambda g: seen.extend(g) or fake_embed(g))

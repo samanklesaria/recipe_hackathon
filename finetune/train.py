@@ -17,7 +17,7 @@ import store_llm
 
 PROMPTS = {"ingredient": store_llm.ING_PREFIX, "store": store_llm.STORE_PREFIX}
 
-OUT = "finetune/embeddinggemma_store_lora"
+OUT = "finetune/embedding_store_lora"
 
 # Store blurbs that state outright what they do and don't carry.
 EXPLICIT_CSV = "finetune/explicit_store_examples.csv"
@@ -29,9 +29,9 @@ EVAL_CSV = "finetune/eval_pairs.csv"
 # The gloss, not the raw ingredient string -- a 300m encoder cannot tell what
 # "urad dal" is, and the eval side embeds the gloss too.
 SQL = """
-SELECT e.expansion, s.description, d.label
+SELECT i.expansion, s.description, d.label
 FROM embed_training_data d
-JOIN ingredient_expansions e ON e.ingredient_id = d.ingredient_id
+JOIN ingredients i ON i.id = d.ingredient_id
 JOIN training_stores s ON s.id = d.training_store_id
 """
 
@@ -83,8 +83,8 @@ def load_eval_pairs(db, path=EVAL_CSV):
     descs = {d.split(":")[0]: d for (d,) in con.execute(
         "SELECT description FROM training_stores").fetchall()}
     glosses = dict(con.execute(
-        "SELECT i.description, e.expansion FROM ingredients i"
-        " JOIN ingredient_expansions e ON e.ingredient_id = i.id").fetchall())
+        "SELECT description, expansion FROM ingredients"
+        " WHERE expansion IS NOT NULL").fetchall())
     with open(path, newline="") as f:
         rows = list(csv.DictReader(f))
     unknown = {c for c in rows[0] if c != "ingredient"} - descs.keys()

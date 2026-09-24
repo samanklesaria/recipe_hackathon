@@ -101,9 +101,6 @@ def apply_merges(con, merges):
         delete from recipe_ingredients;
         insert into recipe_ingredients select * from ri_dedup;
     """)
-    # ponytail: no FK cascade in DuckDB, so clear the child row first.
-    con.executemany("delete from ingredient_expansions where ingredient_id = ?",
-                    [(alias,) for alias, _ in pairs])
     con.executemany("delete from ingredients where id = ?", [(alias,) for alias, _ in pairs])
     return len(pairs)
 

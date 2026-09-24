@@ -66,7 +66,7 @@ def _stored():
 
 
 def load_stores():
-    return "\n".join(_stored()[0])
+    return "\n\n".join(_stored()[0])
 
 
 def save_stores(text):

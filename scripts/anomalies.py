@@ -49,8 +49,6 @@ RECIPE_CHILDREN = [
 ]
 INGREDIENT_CHILDREN = [
     "DELETE FROM recipe_ingredients WHERE ingredient_id = ?",
-    "DELETE FROM ingredient_expansions WHERE ingredient_id = ?",
-    "DELETE FROM ingredient_embeddings WHERE ingredient_id = ?",
     "DELETE FROM embed_training_data WHERE ingredient_id = ?",
 ]
 

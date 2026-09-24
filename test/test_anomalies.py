@@ -19,11 +19,11 @@ def db(tmp_path):
             (1, 'dal'), (2, 'heading with no body'), (3, '{PROSE}');
         INSERT INTO ingredients (id, description) VALUES
             (1, 'urad dal'), (2, '{PROSE}');
+        INSERT INTO training_stores (id, description) VALUES (1, 'a shop');
+        INSERT INTO embed_training_data VALUES (2, 1, 'never');
         INSERT INTO recipe_ingredients VALUES (1, 1, '1 cup'), (3, 2, NULL);
         INSERT INTO recipe_pairings VALUES (1, 3);
         INSERT INTO recipe_requires VALUES (3, 1);
-        INSERT INTO ingredient_expansions VALUES (2, 'prose');
-        INSERT INTO ingredient_embeddings VALUES (2, {[0.0] * 768});
     """)
     return con
 
@@ -39,6 +39,6 @@ def test_delete_clears_the_children_too(tmp_path):
     assert con.execute("SELECT id FROM recipes").fetchall() == [(1,)]
     assert con.execute("SELECT id FROM ingredients").fetchall() == [(1,)]
     for table in ("recipe_ingredients", "recipe_pairings", "recipe_requires",
-                  "ingredient_expansions", "ingredient_embeddings"):
+                  "embed_training_data"):
         left = con.execute(f"SELECT count(*) FROM {table}").fetchone()[0]
         assert left == (1 if table == "recipe_ingredients" else 0), table
