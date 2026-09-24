@@ -1,0 +1,51 @@
+store,item,has
+"Bergstrom Market: Neighborhood grocer in a dry county. Full produce and dairy departments, small butcher counter. Does not sell alcohol of any kind.",wine,0
+"Halvorsen Provisions: Mid-sized independent market. Good selection of local beers and Minnesota ciders, plus a small wine wall. Produce is ordinary.",local beer,1
+"The Green Larder: Strictly vegetarian grocery. Broad produce, tofu and seitan, bulk grains and nuts. Does not sell meat or fish.",ground beef,0
+"Dockside Grocery: Harbor-front market. Sells fish, whole and filleted, landed the same morning. Pantry goods are minimal.",whole fish,1
+"Pinecrest Foods: Rural supermarket. Carries a full butcher counter with beef, pork and poultry. No seafood counter — does not sell fresh fish.",fresh salmon,0
+"Saint Anne's Cheese: Cheesemonger. Deep in raw-milk and aged cheeses, cultured butter, crème fraîche. Sells no produce whatsoever.",tomatoes,0
+"Northgate Halal Market: Halal butcher and grocer. Lamb, goat and chicken slaughtered to halal standards. Does not sell pork or alcohol.",pork shoulder,0
+"Thorne & Daughters: Village shop with a surprisingly good spice cabinet — whole cumin, cardamom, saffron, dried chiles. Produce is limited to onions and potatoes.",saffron,1
+"Meridian Organics: Certified organic grocer. All produce organic, no conventional. Does not carry any refined white sugar or white flour.",white flour,0
+"Foxglove Fine Foods: Specialty shop. Excellent olive oils and aged vinegars, imported anchovies, tinned fish. No refrigerated meat case.",anchovies,1
+"Culver Street Co-op: Member co-op with strong bulk bins — oats, lentils, seeds, baking supplies. Explicitly does not stock bulk spices, only jarred.",bulk lentils,1
+"Rivera Carnicería: Mexican butcher shop. Thin-cut beef, chorizo, carnitas, tripe. Sells masa and tortillas. Does not sell any Asian ingredients.",soy sauce,0
+"Blue Heron Market: Small-town grocery. Sells beer and wine but holds no spirits license — no liquor of any kind.",bourbon,0
+"Ashford Naturals: Health food store. Good selection of gluten-free flours and alternative sweeteners. Sells no wheat products at all.",all-purpose flour,0
+"Kestrel Bakery & Grocer: Bread-focused shop with a small pantry. Sells fresh yeast and high-protein bread flour. Does not sell produce.",bread flour,1
+"Tamarind Lane: Southeast Asian grocer. Fish sauce, tamarind paste, galangal, kaffir lime leaves, fresh herbs in bunches. No European goods.",fish sauce,1
+"Colbert's Dry Goods: Old-fashioned general store. Canned and shelf-stable only. Carries no refrigerated or frozen items — no fresh dairy.",fresh milk,0
+"Winterbourne Farm Stand: Seasonal stand, summer only. Sells tomatoes, sweet corn, squash and berries. No dairy, no meat, no pantry goods.",sweet corn,1
+"Orchard Gate Market: Suburban supermarket. Full grocery with a large kosher section. Sells no shellfish.",shrimp,0
+"Pelletier Frères: French-leaning épicerie. Cultured butter, Dijon, cornichons, duck fat, good baguettes. Stocks duck fat year round.",duck fat,1
+"Sunrise Convenience: Corner store. Chips, soda, candy, cigarettes, a cooler of beer. Does not sell fresh produce.",lettuce,0
+"Hollowell Naturals: Vegan grocery. Cashew cheeses, oat milk, nutritional yeast, mock meats. Does not sell eggs or dairy.",eggs,0
+"Cedarwood Market: Upscale grocer. Excellent selection of local honey and maple syrup from within the state. Meat counter is small but good.",local honey,1
+"Portage Bay Grocery: Neighborhood store. Carries a wide range of dried beans and pulses in bulk. Explicitly does not stock any frozen foods.",frozen peas,0
+"Bellweather Provisions: Small market with a focused pantry. Sells whole-bean coffee roasted in-house. No tea beyond a few supermarket boxes.",whole-bean coffee,1
+"Lindqvist Fisk: Scandinavian fishmonger. Cured and smoked fish, pickled herring, gravlax, cod roe. Sells no shellfish, no meat.",pickled herring,1
+"Grand Avenue Deli: Jewish-style deli and market. Smoked fish, rye bread, pickles, brisket. Does not sell pork products.",bacon,0
+"Fairhaven Bulk: Zero-waste bulk store, bring your own jars. Grains, flours, spices, oils and soaps dispensed by weight. Sells nothing packaged.",bulk olive oil,1
+"Crossroads Supermercado: Latino supermarket. Full carnicería, dried chiles by the bin, Mexican dairy. Good selection of Central American beers.",dried guajillo chiles,1
+"Aubrey's Corner Shop: Tiny urban market. Milk, eggs, bread, a few vegetables. No butcher counter and does not sell fresh meat.",chicken thighs,0
+"Elmgrove Natural Market: Natural foods store. Extensive supplements and bulk herbs. Carries no alcohol and no tobacco.",beer,0
+"Sablefish & Co.: Seafood market with a small retail pantry. Sells fish stock and fish bones for broth. No poultry or red meat.",fish bones,1
+"Thistle & Thorn: Scottish-leaning import shop. Oats, black pudding, haggis in season, Scottish cheeses. Excellent single malt selection.",single malt whisky,1
+"Marigold Market: Indian grocery. Whole spices, ghee, paneer, atta, lentils of every kind. Sells no alcohol.",whisky,0
+"Northern Pines Outfitter Store: Camp supply with a food aisle. Freeze-dried meals, jerky, canned goods. No fresh food of any kind.",fresh basil,0
+"Volkov Gastronom: Eastern European deli. Kielbasa, smetana, buckwheat, pickled vegetables, rye. Good selection of imported vodka.",smetana,1
+"Two Rivers Meat Locker: Custom meat processor and retail counter. Whole and half animals, game processing, sausage. Sells lard and beef tallow.",beef tallow,1
+"Larkspur Grocery: Small organic market. Carries fresh and dried pasta, imported tinned tomatoes. Does not stock any candy or soda.",soda,0
+"Hollis Street Fish Market: Fishmonger with live tanks. Sells live crab and lobster year round. Carries no fillets of freshwater fish.",live crab,1
+"Golden Wheat Bakery Supply: Baking supply shop. Flours by the sack, chocolate in blocks, yeast, pans and molds. Sells no savory ingredients.",baking chocolate,1
+"Quarry Hill Market: Mainstream grocery in a college town. Full liquor department including a good selection of local beers and small-batch gin.",gin,1
+"Sereno Mercato: Italian import shop. Tinned San Marzano, dried pasta, Parmigiano, prosciutto. Does not sell fresh produce.",fresh arugula,0
+"Bayview Asian Foods: Pan-Asian grocery. Rice by the sack, noodles fresh and dried, full aisle of sauces. Does not carry a butcher counter.",pork belly,0
+"Fenwick Farm Dairy: Dairy store attached to a working farm. Raw milk, cream, butter, farmstead cheese, eggs. Nothing else.",heavy cream,1
+"Drummond's Discount Foods: Salvage grocery selling close-dated and overstock goods. Canned and boxed only. Does not sell fresh produce or meat.",canned tomatoes,1
+"Stillwater Provisions: Small-batch pantry shop. Fermented goods — miso, kimchi, vinegars, kraut — plus koji. Sells no fresh meat.",miso,1
+"Cranfield Grocery: Suburban supermarket with a strict store policy against selling tobacco or alcohol. Otherwise a full-service grocery.",cooking wine,0
+"Palisade Produce: Wholesale produce house open to the public. Cases of vegetables and fruit only. No dry goods, no dairy, no meat.",case of onions,1
+"Havenwood Market: General grocery with an unusually deep frozen section. Frozen berries, vegetables, seafood and dough. Fresh seafood is not sold here.",frozen shrimp,1
+"Oakfield Pantry: Village shop specializing in preserves. Jams, chutneys, pickles, honey, curds. Carries no refrigerated meat or fish.",smoked salmon,0

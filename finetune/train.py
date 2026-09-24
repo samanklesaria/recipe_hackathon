@@ -1,5 +1,6 @@
 """Fine-tune embeddinggemma-300m into the two-tower store matcher.
 """
+import csv
 import duckdb
 import fire
 import numpy as np
@@ -17,6 +18,13 @@ import store_llm
 PROMPTS = {"ingredient": store_llm.ING_PREFIX, "store": store_llm.STORE_PREFIX}
 
 OUT = "finetune/embeddinggemma_store_lora"
+
+# Store blurbs that state outright what they do and don't carry.
+EXPLICIT_CSV = "finetune/explicit_store_examples.csv"
+
+# Hand-checked grid: ingredients down the rows, training-store names across the
+# top, PROBS words in the cells.
+EVAL_CSV = "finetune/eval_pairs.csv"
 
 # The gloss, not the raw ingredient string -- a 300m encoder cannot tell what
 # "urad dal" is, and the eval side embeds the gloss too.
@@ -56,6 +64,46 @@ def load_training_data(db):
     })
 
 
+def load_explicit_data(path):
+    ds = Dataset.from_csv(path)
+    return ds.map(
+        lambda r: {"ingredient": r["item"], "store": r["store"],
+                   # same ceiling as PROBS: hard 0/1 targets send logits to inf
+                   "label": PROBS["always"] if r["has"] else PROBS["never"]},
+        remove_columns=ds.column_names)
+
+
+def load_eval_pairs(db, path=EVAL_CSV):
+    """The wide hand-checked grid, melted into the same three columns.
+
+    Columns are store *names*; training_stores stores the whole "Name: blurb"
+    line, so match on the leading name. Not a plain split(":") -- some rows
+    separate the name with a period instead.
+    """
+    con = duckdb.connect(db, read_only=True)
+    rows = [d for (d,) in con.execute(
+        "SELECT description FROM training_stores").fetchall()]
+    descs = {d[:i]: d for d in rows
+             for i in [min((d.find(c) for c in ":." if c in d), default=-1)]
+             if i > 0}
+    glosses = dict(con.execute(
+        "SELECT i.description, e.expansion FROM ingredients i"
+        " JOIN ingredient_expansions e ON e.ingredient_id = i.id").fetchall())
+    with open(path, newline="") as f:
+        rows = list(csv.DictReader(f))
+    unknown = {c for c in rows[0] if c != "ingredient"} - descs.keys()
+    if unknown:
+        raise SystemExit(f"{path}: not in training_stores: {sorted(unknown)}")
+    out = {"ingredient": [], "store": [], "label": []}
+    for row in rows:
+        ing = row.pop("ingredient")
+        for store, label in row.items():
+            out["ingredient"].append(glosses.get(ing, ing))
+            out["store"].append(descs[store])
+            out["label"].append(PROBS[label])
+    return Dataset.from_dict(out)
+
+
 def score(model, gloss, descs):
     """The (ingredient, store) logit matrix, scored the way training does."""
     with torch.no_grad():
@@ -67,6 +115,9 @@ def score(model, gloss, descs):
 def main(db=settings.DB, out=OUT, epochs=1.0, batch_size=32, lr=2e-5):
     split = load_training_data(db).train_test_split(
         test_size=0.1, seed=3407)
+    explicit = load_explicit_data(EXPLICIT_CSV).train_test_split(
+        test_size=0.1, seed=3407)
+    checked = load_eval_pairs(db).train_test_split(test_size=0.1, seed=3407)
 
     # Not unsloth: without bf16 (Turing) it keeps the base weights in fp16 and
     # turns off loss scaling, so the backward pass overflows to NaN.
@@ -86,12 +137,14 @@ def main(db=settings.DB, out=OUT, epochs=1.0, batch_size=32, lr=2e-5):
 
     SentenceTransformerTrainer(
         model=model,
-        train_dataset=split["train"],
+        train_dataset={"db": split["train"], "explicit": explicit["train"],
+                       "checked": checked["train"]},
         # ponytail: no evaluator -- eval_dataset runs DotBCELoss held out and
         # logs eval_loss. Add EmbeddingSimilarityEvaluator(main_similarity=
         # SimilarityFunction.DOT_PRODUCT) if you want Spearman too, but it
         # ignores `prompts`, so bake the prefixes into the strings first.
-        eval_dataset=split["test"],
+        eval_dataset={"db": split["test"], "explicit": explicit["test"],
+                      "checked": checked["test"]},
         loss=DotBCELoss(model),
         args=SentenceTransformerTrainingArguments(
             num_train_epochs=epochs,

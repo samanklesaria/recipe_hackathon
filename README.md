@@ -95,11 +95,14 @@ uv run pytest
 
 ## Future work
 
+- Within a grocery store, sort into produce, dairy, cans & bottles, frozen, other-refrigerated. Or we could just cluster the embeddings.
+- Over-sample hard cases (nearby but different labels) when building embedding model.
 - Parsing epubs needs debugging.
 - LLM guesses about ingredient availability aren't perfect. Fine tune on manually created data as well as stores with explicit instructions (e.g. "does not stock fish or meat"). 
 - The GUI should allow you to add cookbooks incrementally rather than all at once
 - The GUI should allow you to pin the sampled recipes you like and re-sample the rest
 - The GUI should open the chosen recipes in your default epub reader on double click.
+- Should look over generated training data to catch obvious errors.
+- Remove desserts, appetizers, side salads.
 
-There will also be a grocery list view iOS app for use while grocery shopping
-- This should sync to the PyQt GUI and among other shoppers in the family.
+- Make a grocery list view iOS app for use while shopping. This should sync to the PyQt GUI and among other shoppers in the family.
